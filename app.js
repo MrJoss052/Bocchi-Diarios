@@ -25,8 +25,25 @@ const bocchis = {
         description: [
             "Equipo de Bocchi Diarios"
         ]
+    },
+    codigos: {
+        title: "Códigos",
+        description: [
+            "¿Tenés un código? Ingresalo acá abajo, puede llevarte a algún lugar especial de la wiki."
+        ]
     }
 };
+
+let codigos = {};
+
+async function cargarCodigos() {
+    try {
+        const res = await fetch("codigos/lista.json");
+        codigos = await res.json();
+    } catch {
+        console.error("No se pudieron cargar los códigos.");
+    }
+}
 
 async function cargarBocchis() {
     try {
@@ -77,6 +94,11 @@ function obtenerBandera(pais) {
     return BANDERAS[normal] || "";
 }
 
+function urlAvatar(handle) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    return `https://unavatar.io/tiktok/${handle}?v=${hoy}`;
+}
+
 function formatearFecha(fecha) {
     const [dia, mes, anio] = fecha.split("/").map(Number);
     const hoy = new Date();
@@ -120,7 +142,7 @@ const SUPABASE_URL = "https://cmazyixgizxearvzeopj.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtYXp5aXhnaXp4ZWFydnplb3BqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NDA0NjAsImV4cCI6MjEwMjIxNjQ2MH0.romiA-uowC11exJLPen-9cRrZrP-9LIgo4yscnRMM5c";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const NO_LISTABLES = ["inicio", "bocchis", "buzon", "creditos"];
+const NO_LISTABLES = ["inicio", "bocchis", "buzon", "creditos", "codigos"];
 
 let visitas = {};
 
@@ -145,7 +167,7 @@ async function registrarVisita(clave) {
 
 function renderIcono(clave, data, numero) {
     const handle = data.atributos && data.atributos.Tiktok ? data.atributos.Tiktok.replace("@", "") : null;
-    const avatar = handle ? `https://unavatar.io/tiktok/${handle}` : "";
+    const avatar = handle ? urlAvatar(handle) : "";
     const badge = numero ? `<span class="bocchi-rank">#${numero}</span>` : "";
     return `
       <a href="#${clave}" class="bocchi-icono">
@@ -173,7 +195,7 @@ function renderCreditoPersona(nombre, rol) {
         const [clave, data] = encontrado;
         const handle = data.atributos && data.atributos.Tiktok ? data.atributos.Tiktok.replace("@", "") : null;
         const avatar = handle
-            ? `https://unavatar.io/tiktok/${handle}`
+            ? urlAvatar(handle)
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(data.title)}&background=44244c&color=fff&size=128&rounded=true&bold=true`;
 
         return `
@@ -254,6 +276,47 @@ function initBuzon() {
     });
 }
 
+function renderFormularioCodigos() {
+    return `
+      <form id="form-codigos" class="card-stats buzon-form">
+        <label>
+          Código
+          <input type="text" id="codigo-input" placeholder="Ingresá un código..." autocomplete="off">
+        </label>
+        <button type="submit">Aceptar</button>
+        <p id="codigo-estado" class="buzon-estado"></p>
+      </form>
+    `;
+}
+
+function initCodigos() {
+    const form = document.getElementById("form-codigos");
+    if (!form) return;
+
+    form.addEventListener("submit", (evento) => {
+        evento.preventDefault();
+
+        const input = document.getElementById("codigo-input");
+        const estado = document.getElementById("codigo-estado");
+        const codigo = input.value.trim().toLowerCase();
+
+        if (!codigo) return;
+
+        const destino = codigos[codigo];
+
+        if (destino) {
+            estado.className = "buzon-estado exito";
+            estado.textContent = "¡Código correcto! Redirigiendo...";
+            window.location.href = destino;
+        } else {
+            estado.className = "buzon-estado error";
+            estado.textContent = "Código no válido.";
+        }
+
+        input.value = "";
+    });
+}
+
 function loadPage() {
     window.scrollTo(0, 0);
 
@@ -268,7 +331,7 @@ function loadPage() {
         : null;
 
     const avatarHTML = activeHandle
-        ? `<img src="https://unavatar.io/tiktok/${activeHandle}" alt="${data.title}" class="bocchi-avatar">`
+        ? `<img src="${urlAvatar(activeHandle)}" alt="${data.title}" class="bocchi-avatar">`
         : "";
 
     const visitasHTML = data.atributos
@@ -338,6 +401,7 @@ function loadPage() {
     const bocchisGridHTML = pageCurr === "bocchis" ? `<div class="bocchis-grid">${renderIconos(false)}</div>` : "";
     const buzonHTML = pageCurr === "buzon" ? renderFormularioBuzon() : "";
     const creditosHTML = pageCurr === "creditos" ? renderCreditos() : "";
+    const codigosHTML = pageCurr === "codigos" ? renderFormularioCodigos() : "";
 
     content.innerHTML = `
     <article class="wiki-article">
@@ -355,6 +419,7 @@ function loadPage() {
       ${bocchisGridHTML}
       ${buzonHTML}
       ${creditosHTML}
+      ${codigosHTML}
       ${atributosHTML}
       ${iniciosHTML}
       ${curiosidadesHTML}
@@ -373,6 +438,7 @@ function loadPage() {
     if (data.atributos) registrarVisita(pageCurr);
 
     initBuzon();
+    initCodigos();
 }
 
 function initBuscador() {
@@ -436,7 +502,7 @@ function initBuscador() {
 
 window.addEventListener("hashchange", loadPage);
 window.addEventListener("DOMContentLoaded", async () => {
-    await Promise.all([cargarBocchis(), cargarVisitas()]);
+    await Promise.all([cargarBocchis(), cargarVisitas(), cargarCodigos()]);
     loadPage();
     initBuscador();
 });
